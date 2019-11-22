@@ -3,13 +3,14 @@ from tkinter import*
 from PIL import Image #
 import math
 class Tank(object):
-    def __init__(self,mode):
+    def __init__(self,mode,x,y,direction):
         self.mode=mode
         self.lives=3
-        self.x=self.mode.app.width//2
-        self.y=self.mode.app.width//2
+        self.alive=True
+        self.x=x
+        self.y=y
         self.dx=10
-        self.direction="Right"
+        self.direction=direction
         self.angle=0
         self.armLength=25
         self.armWidth=10
@@ -28,6 +29,8 @@ class Tank(object):
         self.newArmYDistance=0
         self.armImageX=0
         self.armImageY=0
+        #for angle in range(0,180)
+        #self.tacoDict
         heartURL=('https://cdn.pixabay.com/photo/2017/09/23/16/33/'+
         'pixel-heart-2779422_1280.png')
         heart=self.mode.loadImage(heartURL)
@@ -37,10 +40,11 @@ class Tank(object):
         if cordinate=="Right":
             self.x=self.x+self.dx
             self.direction=cordinate
-            self.tacoImage.transpose(Image.FLIP_LEFT_RIGHT)
+            self.tacoImage=self.tacoImage.transpose(Image.FLIP_LEFT_RIGHT)
         if cordinate=="Left":
             self.x=self.x-self.dx
             self.direction=cordinate
+            self.tacoImage=self.tacoImage.transpose(Image.FLIP_LEFT_RIGHT)
         if cordinate=="Up":
             self.angle+=5
             if self.angle>90:
@@ -51,28 +55,37 @@ class Tank(object):
                 self.angle=-30
         print(self.angle)
         if cordinate=="Space":
-            self.mode.bullets.append(Bullet(self.mode,self.x,self.y,
-            self.direction,self.angle))
+            if self.alive==True:
+                if self.mode.BulletTypes[self.mode.BulletTypeIndex]=="Bullet":
+                    self.mode.bullets.append(Bullet(self.mode,self.x,self.y,
+                    self.direction,self.angle))
+                if self.mode.BulletTypes[self.mode.BulletTypeIndex]=="Bomb":
+                    self.mode.bullets.append(Bomb(self.mode,self.x,self.y,
+                    self.direction,self.angle))
         if(self.x>self.mode.app.width):
             self.x-=self.dx
         if self.x<0:
             self.x+=self.dx
-
+    #moves tank arm
     def moveTankArm(self):
-        self.tacoImage.rotate(2*math.radians(self.angle))
+        #here to help me figure out how to rotate images
+        #self.tacoImage = self.tacoImage.rotate(self.angle)
+        #dict[angle]=image
+        self.tacoImage.rotate(self.angle)
         
         #if we want the arm to follow the mouse cursor
         deltaY=self.mode.cursor[1]-self.armY1
         deltaX=self.mode.cursor[0]-self.armX1
         if deltaX<2:
             deltaX=2
-        
         theta=math.atan(deltaY/deltaX)
+        #uses the angle given by using up and down arrows
         self.newArmXDistance=self.armLength*math.cos(math.radians(self.angle))
         self.newArmYDistance=self.armLength*math.sin(math.radians(self.angle))
         bottomAngle=0
         self.armX1=self.x
         self.armY1=self.y-10
+        #sets up the barrel(arm) of the tank to move around
         if self.direction=="Right":
             self.armX2=self.armX1+self.newArmXDistance
             self.armImageX=self.x+self.newArmXDistance/2
@@ -81,6 +94,7 @@ class Tank(object):
             self.armX2=self.armX1-self.newArmXDistance
             self.armImageX=self.x-self.newArmXDistance/2
             self.tacoImage.transpose(Image.FLIP_LEFT_RIGHT)
+        #sets up the y position of the arm to move around
         self.armY2=self.armY1-self.newArmYDistance
         self.armX3=self.armX1-6
         self.armY3=self.armY1-12
@@ -88,34 +102,48 @@ class Tank(object):
         self.armY4=self.armY2-12
         self.armImageY=self.y-10-self.newArmYDistance/2
         
-
+    #check to see if the bullet collided with the tank
+    #if it hasn't then it will add to a new list that will then
+    #become the list that holds bullets on the screen
     def checkBulletCollisions(self):
         bulletsToKeep=[]
         for i in range(len(self.mode.bullets)):
             if self.mode.bullets[i].containsPoint(self.x,
             self.y) and isinstance(self.mode.bullets[i],Bullet):
                 self.lives-=1
+            if self.mode.bullets[i].containsPoint(self.x,
+            self.y) and isinstance(self.mode.bullets[i],Bomb):
+                self.lives-=1
+                self.x-=10
             else:
                 bulletsToKeep+=[self.mode.bullets[i]]
         self.mode.bullets=bulletsToKeep
     
+    def checkIfAlive(self):
+        if self.lives==0:
+            self.alive=False
+
     def timerFired(self):
-        self.checkBulletCollisions()
-        self.moveTankArm()
+        self.checkIfAlive()
+        if self.alive==True:
+            self.checkBulletCollisions()
+            self.moveTankArm()
+        
 
 
     def draw(self, canvas):
-        if(self.mode.isGameOver==False):
-            canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
-            fill='green')
-            canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
-            self.armX4,self.armY4,self.armX3,self.armY3,fill='green')
-        #draw lives in the top right
-        for i in range(self.lives):
-            canvas.create_image(self.mode.app.width-(1+i)*50, 40,
-        image=ImageTk.PhotoImage(self.heart))
-        canvas.create_image(self.armImageX,
-        self.armImageY,image=ImageTk.PhotoImage(self.tacoImage))
+        if self.alive==True:
+            if(self.mode.isGameOver==False):
+                canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
+                fill='green')
+                canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
+                self.armX4,self.armY4,self.armX3,self.armY3,fill='green')
+            #draw lives in the top right
+            for i in range(self.lives):
+                canvas.create_image(self.mode.app.width-(1+i)*50, 40,
+            image=ImageTk.PhotoImage(self.heart))
+            canvas.create_image(self.armImageX,
+            self.armImageY,image=ImageTk.PhotoImage(self.tacoImage))
 
 class Block(object):
     pass
@@ -127,7 +155,7 @@ class Bullet(object):
         self.y=y-10
         self.direction=direction
         self.angle=math.radians(angle)
-        self.change=(0,0)
+        self.color='black'
         self.gravity=9.81
         self.velocity=50
         self.initialDistanceXAdded=self.mode.tank1.armLength*2*math.cos(self.angle)
@@ -149,20 +177,20 @@ class Bullet(object):
     
     def __hash__(self):
         return hash(self.x,self.y,self.direction,self.angle)
-    
+    #checks the distnce between two points
     def distance(self,x1,y1,x2,y2):
         return ((x1-x2)**2+(y1-y2)**2)**.5
     #checks if the item contains the point
     def containsPoint(self,x,y):
         return self.distance(self.dx,self.dy,x,y)<11
-
-    def convertAngle(self):
-        return (self.velocity*math.cos(self.angle),self.velocity*math.sin(self.angle))
-    
+    #the physics behind the movement of the bullet
     def fireBullet(self,direction):
+        #gets the velocity of X and Y of the the bullet
         vx=self.velocity*math.cos(self.angle)
         vy=self.velocity*math.sin(self.angle)
         self.time+=.1
+        #depending on the direction of the tank it changes
+        #the x direction of the bullet
         if self.direction=="Right":
             self.dy=self.y-vy*self.time +(self.gravity/2)*self.time*self.time
             self.dx=self.x+vx*self.time
@@ -170,27 +198,69 @@ class Bullet(object):
             self.dy=self.y-vy*self.time +(self.gravity/2)*self.time*self.time
             self.dx=self.x-vx*self.time
 
-        
+    def bulletReachesGround(self):
+        bulletsToKeep=[]
+        for bullet in self.mode.bullets:
+            if bullet.dy>self.mode.app.height//2+20:
+                pass
+            else:
+                bulletsToKeep+=[bullet]
+        self.mode.bullets=bulletsToKeep
+
+
     def timerFired(self):
         self.fireBullet(self.direction)
-        self.change=self.convertAngle()
+        self.bulletReachesGround()
         # if self.direction=="Right":
         #     self.x+=self.change[0]
         #     self.y-=self.change[1]
         # else:
         #     self.x-=self.change[0]
         #     self.y-=self.change[1]
-
+    #draws bullet
     def draw(self,canvas):
         canvas.create_oval(self.dx+5,self.dy+5,self.dx-5,self.dy-5,
-        fill='black')
+        fill=self.color)
+class Bomb(Bullet):
+    def __init__(self,mode,x,y,direction,angle):
+        self.mode=mode
+        #initial x and y
+        self.x=x
+        self.y=y-10
+        self.direction=direction
+        self.angle=math.radians(angle)
+        self.color='red'
+        self.gravity=9.81
+        self.velocity=50
+        self.initialDistanceXAdded=self.mode.tank1.armLength*2*math.cos(self.angle)
+        #15 is a random distance, but it will be the size of the tank ?arm?
+        self.initialDistanceYAdded=self.mode.tank1.armLength*2*math.sin(self.angle)
+        self.time=0
+        #the change in x and y and the position of the bullet
+        self.dy=0
+        self.dx=0
+        if self.direction=="Right":
+            self.x+=self.initialDistanceXAdded
+            self.y-=self.initialDistanceYAdded
+        else:
+            self.x-=self.initialDistanceXAdded
+            self.y-=self.initialDistanceYAdded
+
+    def __eq__(self,other):
+        return isinstance(other,Bomb)
+
 class GameMode(Mode):
     def appStarted(mode):
         mode.cursor=[-1,-1]
         mode.bullets=[]
         mode.hearts=[]
-        mode.tank1=Tank(mode)
-        #creates enemy cactus in cacti dictionary
+        mode.tank1=Tank(mode,mode.app.width//2-mode.app.width//4,
+        mode.app.height//2,"Right")
+        #creates enemy tank
+        mode.tank2=Tank(mode,mode.app.width//2+mode.app.width//4,
+        mode.app.height//2,"Left")
+        mode.BulletTypeIndex=0
+        mode.BulletTypes=["Bullet","Bomb"]
         
         #sets up functions for the end game
         mode.died=False
@@ -214,17 +284,31 @@ class GameMode(Mode):
         for heart in mode.hearts:
             if heart.containsPoint(event.x+mode.scrollX,event.y):
                 mode.draggingHeart=heart
+        mode.changeBulletType(event)
     def mouseReleased(mode,event):
         pass
     def mouseDragged(mode,event):
         mode.cursor=[event.x,event.y]
+        print(event.x,event.y)
         pass
         # if not mode.draggingHeart is None:
         #     mode.draggingHeart.x=event.x+mode.scrollX
         #     mode.draggingHeart.y=event.y
 
+    def changeBulletType(mode,event):
+        (leftX1,endPointY,leftX2,y3,rightX1,y2,rightX2,endPointY)=mode.getSelectionTrianglePoints()
+        if (event.x<leftX2 and event.x>leftX1 and
+            event.y<y3 and event.y>y2):
+            mode.BulletTypeIndex=(mode.BulletTypeIndex+1)%len(mode.BulletTypes)
+        if (event.x<rightX2 and event.x>rightX1 and
+            event.y<y3 and event.y>y2):
+            mode.BulletTypeIndex=(mode.BulletTypeIndex+1)%len(mode.BulletTypes)
+
+
+
     def timerFired(mode):
         mode.tank1.timerFired()
+        mode.tank2.timerFired()
         for bullet in mode.bullets:
             bullet.timerFired()
         if(mode.isGameOver==False):
@@ -232,11 +316,40 @@ class GameMode(Mode):
         #changes isGameOver if player died
         if(mode.died==True):
             mode.isGameOver=True
-         
+
+    def getSelectionTrianglePoints(mode):
+        distanceFromTriangelPoint=32
+        distanceFromTriangles=125
+        leftX1=mode.app.width*.01
+        endPointY=mode.app.height//25
+        leftX2=leftX1+(distanceFromTriangelPoint//2)*(3)**(1/2)
+        y2=endPointY-distanceFromTriangelPoint//2
+        y3=endPointY+distanceFromTriangelPoint//2
+        rightX1=leftX2+distanceFromTriangles
+        rightX2=leftX2+distanceFromTriangles+(distanceFromTriangelPoint//2)*(3)**(1/2)
+        return (leftX1,endPointY,leftX2,y3,rightX1,y2,rightX2,endPointY)
+
+
+
+    def drawBulletSelection(mode,canvas):
+        (leftX1,endPointY,leftX2,y3,rightX1,y2,rightX2,endPointY)=mode.getSelectionTrianglePoints()
+        canvas.create_rectangle(leftX2,y2,
+        rightX1-1,y3,fill='grey')
+        
+        canvas.create_polygon(rightX1,y2,
+        rightX1,y3,
+        rightX2,endPointY,
+        fill='yellow',)
+        
+        canvas.create_polygon(leftX1,endPointY,leftX2,y2,leftX2,y3,fill='yellow')
+        canvas.create_text(rightX2//2,endPointY,text=mode.BulletTypes[mode.BulletTypeIndex])
+
     def redrawAll(mode,canvas):
         mode.tank1.draw(canvas)
+        mode.tank2.draw(canvas)
         for bullet in mode.bullets:
             bullet.draw(canvas)
+        mode.drawBulletSelection(canvas)
         if(mode.isGameOver==True):
             if(mode.died==True):
                 font = 'Arial 26 bold'
@@ -275,5 +388,5 @@ class MyModalApp(ModalApp):
         app.timerDelay = 50
  
 def runTanks():
-    MyModalApp(width=600,height=600)
+    MyModalApp(width=700,height=700)
 runTanks()
