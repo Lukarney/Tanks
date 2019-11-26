@@ -1,5 +1,5 @@
 
-# CITATION: I got the cmu_112_graphics from 15-112 website
+# CITATION: I got the cmu_112_graphics from 15-112 website https://www.cs.cmu.edu/~112/index.html
 from cmu_112_graphics import *
 from tkinter import*
 from PIL import Image #
@@ -194,13 +194,17 @@ class Enemy(Tank):
         self.timeDied=0
         #for angle in range(0,180)
         #self.tacoDict
+        def __eq__(self,other):
+            return isinstance(other,Enemy)
 
     def timerFired(self):
         if self.bulletTimer>3:
                 self.bulletTimer=0
                 if self.alive==True:
-                    self.mode.bullets.append(Bullet(self.mode,self.x,self.y,
-                    self.direction,self.angle))
+                    otherTankX=self.mode.tank1.x
+                    otherTankY=self.mode.app.height//2
+                    self.mode.bullets.append(EnemyBullet(self.mode,self.x,self.y,
+                    self.direction,otherTankX,otherTankY))
         self.bulletTimer+=.1
         self.time+=1
         self.checkIfAlive()
@@ -223,33 +227,125 @@ class Enemy(Tank):
                 fill='red')
                 canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
                 self.armX4,self.armY4,self.armX3,self.armY3,fill='red')
+            if (isinstance(self,ZombieFriend)):
+                canvas.create_text(self.x,self.y-30,text=self.countDownTillDeath//10)
 
 class ZombieEnemy(Enemy):
+    def __eq__(self,other):
+        return isinstance(other,ZombieEnemy)
     def draw(self, canvas):
         if self.alive==True:
             if(self.mode.isGameOver==False):
                 canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
-                fill='red')
+                fill='purple')
                 canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
                 self.armX4,self.armY4,self.armX3,self.armY3,fill='purple')
 
-class ZombieFriend(Tank):
-    pass        
+    def checkIfAlive(self):
+        if self.lives==0:
+            self.mode.tankEnemyKills+=1
+            self.lives-=1
+            self.alive=False
+            self.mode.points+=15
+            self.timeDied=self.mode.totalTime
+            self.mode.tank3Exist=True
+            self.mode.tank3=ZombieFriend(self.mode,
+            self.mode.app.width//2-self.mode.app.width//4,self.mode.app.height//2,"Right")
+
+class ZombieFriend(Enemy):
+    def __init__(self,mode,x,y,direction):
+        self.mode=mode
+        self.lives=3
+        self.alive=True
+        self.x=x
+        self.y=y
+        self.dx=10
+        self.direction=direction
+        self.angle=30
+        self.armLength=25
+        self.armWidth=10
+        tacoURL='https://i.imgur.com/sQSdSo8.png'
+        tacoImage=self.mode.loadImage(tacoURL)
+        self.tacoImage=self.mode.scaleImage(tacoImage,1/10)
+        self.armX1=self.x
+        self.armY1=self.y-10
+        self.armX2=self.x+self.armLength
+        self.armY2=self.y-18
+        self.armX3=self.armX1-3
+        self.armY3=self.armY1-4
+        self.armX4=self.armX2-3
+        self.armY4=self.armY2-4
+        self.newArmXDistance=0
+        self.newArmYDistance=0
+        self.armImageX=0
+        self.armImageY=0
+        self.bulletTimer=0
+        self.time=0
+        self.timeDied=0
+        self.mode.tank3Exist=True
+        self.color="light purple"
+        self.countDownTillDeath=300
+
+    def __eq__(self,other):
+        return isinstance(other,ZombieFriend)
+    
+
+    def checkIfAlive(self):
+        if self.lives==0:
+            self.mode.tankEnemyKills+=1
+            self.lives-=1
+            self.alive=False
+            self.mode.points+=15
+            self.mode.tank3Exist=False
+            self.timeDied=self.mode.totalTime       
+
+    def timerFired(self):
+        if self.bulletTimer>3:
+                self.bulletTimer=0
+                if self.alive==True:
+                    otherTankX=self.mode.tank2.x+10
+                    otherTankY=self.mode.app.height//2
+                    self.mode.bullets.append(EnemyBullet(self.mode,self.x,self.y,
+                    self.direction,otherTankX,otherTankY))
+        self.bulletTimer+=.1
+        self.time+=1
+        self.countDownTillDeath-=1
+        if self.time==300:
+            self.lives=0
+        self.checkIfAlive()
+        if self.alive==True:
+            self.checkBulletCollisions()
+            self.moveTankArm() 
 
 class Player(Tank):
+
+    def __eq__(self,other):
+        return isinstance(other,Player)
+
 
     def timerFired(self):
         self.bulletTimer+=.1
         self.time+=1
         if len(self.mode.coins)<10 and self.time%100==0:
             for i in range(1):
-                randomX=random.randint(10,self.mode.app.width)
-                randomY=random.randint(10,self.mode.app.height//2)
+                randomX=random.randint(10,self.mode.app.width-10)
+                randomY=random.randint(self.mode.app.height//2-self.mode.app.height//4,self.mode.app.height//2)
                 self.mode.coins.append(Coin(self.mode,randomX,randomY))
         self.checkIfAlive()
         if self.alive==True:
+            self.checkCoinCollisions()
             self.checkBulletCollisions()
             self.moveTankArm()
+
+    def checkCoinCollisions(self):
+        coinsToKeep=[]
+        for i in range(len(self.mode.coins)):
+            if (self.mode.coins[i].containsPoint(self.x,
+            self.y-5) and isinstance(self.mode.coins[i],Coin)):
+                self.mode.points+=1
+            else:
+                coinsToKeep+=[self.mode.coins[i]]
+        self.mode.coins=coinsToKeep
 
     
 
@@ -274,7 +370,7 @@ class Coin(object):
         return ((x1-x2)**2+(y1-y2)**2)**.5
     #checks if the item contains the point
     def containsPoint(self,x,y):
-        return self.distance(self.x,self.y,x,y)<10
+        return self.distance(self.x,self.y,x,y)<=15
     
             
 
@@ -317,9 +413,10 @@ class Bullet(object):
         return ((x1-x2)**2+(y1-y2)**2)**.5
     #checks if the item contains the point
     def containsPoint(self,x,y):
-        return self.distance(self.dx,self.dy,x,y)<11
+        return self.distance(self.dx,self.dy,x,y)<=15
     #the physics behind the movement of the bullet
     def fireBullet(self,direction):
+        
         #gets the velocity of X and Y of the the bullet
         vx=self.velocity*math.cos(self.angle)
         vy=self.velocity*math.sin(self.angle)
@@ -332,6 +429,7 @@ class Bullet(object):
         if self.direction=="Left":
             self.dy=self.y-vy*self.time +(self.gravity/2)*self.time*self.time
             self.dx=self.x-vx*self.time
+
 
     def bulletReachesGround(self):
         bulletsToKeep=[]
@@ -367,6 +465,74 @@ class Bullet(object):
     def draw(self,canvas):
         canvas.create_oval(self.dx+5,self.dy+5,self.dx-5,self.dy-5,
         fill=self.color)
+
+class EnemyBullet(Bullet):
+    def __init__(self,mode,x,y,direction,endX,endY):
+        self.mode=mode
+        self.x=x
+        self.y=y-15
+        self.direction=direction
+        self.endX=endX
+        self.endY=endY
+        self.gravity=9.81
+        self.velocity=60
+        self.dx=0
+        self.dy=0
+        self.time=0
+        self.color='black'
+
+    def __eq__(self,other):
+        return isinstance(other,EnemyBullet)
+    
+    def __hash__(self):
+        return hash(self.x,self.y,self.direction)
+
+    def fireBullet(self,direction):
+        X=(self.endX-self.x)
+        h=(self.endY-self.y)
+        if X<0:
+            print(X)
+        #print(X,h)
+        phi=math.atan(X/h)
+        #print(phi)
+        a=((-self.gravity*(X**2))/self.velocity**2)
+        #print(a)
+        radians=(a+h)/(h**2+X**2)**(1/2)
+        #print(radians)
+        try:
+            theta=(math.acos(radians)+phi)/2
+            #theta=.5*math.asin(-self.gravity*X/self.velocity**2)
+            vx=self.velocity*math.cos(theta)
+            vy=self.velocity*math.sin(theta)
+        except:
+            
+            if direction=="Right":
+                theta=math.radians(30)
+                vx=-self.velocity*math.cos(theta)
+            else:
+                theta=math.radians(30)
+                vx=self.velocity*math.cos(theta)
+            vy=self.velocity*math.sin(theta)
+        
+        
+        
+        
+        #theta=.5*math.asin(-self.gravity*X/self.velocity**2)
+        #print("theta: ",theta)
+        # vx=self.velocity*math.cos(theta)
+        # vy=self.velocity*math.sin(theta)
+        self.time+=.1
+        #depending on the direction of the tank it changes
+        #the x direction of the bullet
+        # if self.direction=="Right":
+        #     self.dy=self.y-vy*self.time +(self.gravity/2)*self.time*self.time
+        #     self.dx=self.x+vx*self.time
+        # if self.direction=="Left":
+        #     self.dy=self.y-vy*self.time +(self.gravity/2)*self.time*self.time
+        #     self.dx=self.x-vx*self.time
+        self.dy=self.y-vy*self.time +(self.gravity/2)*self.time*self.time
+        self.dx=self.x-vx*self.time
+
 class Bomb(Bullet):
     def __init__(self,mode,x,y,direction,angle):
         self.mode=mode
@@ -445,9 +611,11 @@ class GameMode(Mode):
         mode.coins=[]
         mode.totalTime=0
         mode.tankEnemyKills=0
+        mode.tank3Exist=False
+        mode.leaderBoard=[]
         for i in range(1):
             randomX=random.randint(10,mode.app.width-10)
-            randomY=random.randint(10,mode.app.height//2-10)
+            randomY=random.randint(mode.app.height//2-mode.app.height//4,mode.app.height//2)
             mode.coins.append(Coin(mode,randomX,randomY))
 
         
@@ -500,6 +668,8 @@ class GameMode(Mode):
         mode.totalTime+=1
         mode.tank1.timerFired()
         mode.tank2.timerFired()
+        if mode.tank3Exist:
+            mode.tank3.timerFired()
         if mode.tank2.alive==False and (mode.totalTime-mode.tank2.timeDied)==20:
             if mode.tankEnemyKills%3==0:
                 mode.tank2=ZombieEnemy(mode,mode.app.width//2+mode.app.width//3,
@@ -510,11 +680,16 @@ class GameMode(Mode):
 
         for bullet in mode.bullets:
             bullet.timerFired()
-        if(mode.isGameOver==False):
+        if(mode.isGameOver==True):
             pass
         #changes isGameOver if player died
         if(mode.died==True):
             mode.isGameOver=True
+
+    def setLeaderBoard(mode,points,name):
+        if len(mode.leaderBoard)<10:
+            pass
+
 
     def getSelectionTrianglePoints(mode):
         distanceFromTriangelPoint=32
@@ -543,14 +718,18 @@ class GameMode(Mode):
         canvas.create_polygon(leftX1,endPointY,leftX2,y2,leftX2,y3,fill='yellow')
         canvas.create_text(rightX2//2,endPointY,text=mode.BulletTypes[mode.BulletTypeIndex])
     
-    def drawPoints(mode,canvas):
+    def drawPointsAndTime(mode,canvas):
         canvas.create_text(mode.app.width//2-mode.app.width//10,20,text=mode.points)
-        canvas.create_text(mode.app.width//2+mode.app.width//10,20,text=f'time:{mode.totalTime/100}')
+        canvas.create_text(mode.app.width//2+mode.app.width//10,20,text=f'time:{mode.totalTime/10}')
 
     def redrawAll(mode,canvas):
-        mode.drawPoints(canvas)
+        canvas.create_rectangle(0,0,mode.app.width,mode.app.width,fill='light blue')
+        canvas.create_rectangle(0,mode.app.height//2+10,mode.app.width,mode.app.height,fill='dark green')
+        mode.drawPointsAndTime(canvas)
         mode.tank1.draw(canvas)
         mode.tank2.draw(canvas)
+        if mode.tank3Exist:
+            mode.tank3.draw(canvas)
         for bullet in mode.bullets:
             bullet.draw(canvas)
         for coin in mode.coins:
@@ -566,7 +745,9 @@ class GameMode(Mode):
                 text=('WINNER!\n'+
                 'press r to restart')
                 canvas.create_text(mode.width/2, 150,text=text, font=font)
-
+class EndScreenMode(Mode):
+    def appStarted(mode):
+        pass
 class SplashScreenMode(Mode):
     def appStarted(mode):
         pass
