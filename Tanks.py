@@ -1,5 +1,8 @@
 
-# CITATION: I got the cmu_112_graphics from 15-112 website https://www.cs.cmu.edu/~112/index.html
+# CITATION: I got the cmu_112_graphics from 
+# 15-112 website https://www.cs.cmu.edu/~112/notes/notes-animations-part1.html
+#Missile and tank sprites came from DYLESTORM
+#on gamedevmarket https://www.gamedevmarket.net/member/dylestorm/
 from cmu_112_graphics import *
 from tkinter import*
 from PIL import Image #
@@ -15,11 +18,19 @@ class Tank(object):
         self.dx=10
         self.direction=direction
         self.angle=0
-        self.armLength=25
+        self.armLength=15
+        self.aimingArmLength=50
+        self.armX2Aiming=self.x+self.aimingArmLength
+        self.armY2Aiming=self.y-18
+        self.newAimingArmXDistance=0
+        self.newAimingArmYDistance=0
+        self.armY2Aiming=0
+        self.armX2Aiming=0
         self.armWidth=10
         tacoURL='https://i.imgur.com/sQSdSo8.png'
         tacoImage=self.mode.loadImage(tacoURL)
         self.tacoImage=self.mode.scaleImage(tacoImage,1/10)
+        self.tacoImage=self.tacoImage.rotate(math.degrees(self.angle))
         self.armX1=self.x
         self.armY1=self.y-10
         self.armX2=self.x+self.armLength
@@ -41,14 +52,22 @@ class Tank(object):
         'pixel-heart-2779422_1280.png')
         heart=self.mode.loadImage(heartURL)
         self.heart=self.mode.scaleImage(heart,1/30)
+        tankUrl='https://i.imgur.com/zEwkCY6.png'
+        self.tankImage=self.mode.loadImage(tankUrl)
+        self.tankImage=self.mode.scaleImage(self.tankImage,1.5)
+    
 
     def move(self,cordinate):
         if cordinate=="Right":
             self.x=self.x+self.dx
+            if self.direction=="Left":
+                self.tankImage=self.tankImage.transpose(Image.FLIP_LEFT_RIGHT)
             self.direction=cordinate
             self.tacoImage=self.tacoImage.transpose(Image.FLIP_LEFT_RIGHT)
         if cordinate=="Left":
             self.x=self.x-self.dx
+            if self.direction=="Right":
+                self.tankImage=self.tankImage.transpose(Image.FLIP_LEFT_RIGHT)
             self.direction=cordinate
             self.tacoImage=self.tacoImage.transpose(Image.FLIP_LEFT_RIGHT)
         if cordinate=="Up":
@@ -65,14 +84,20 @@ class Tank(object):
                 self.bulletTimer=0
                 if self.alive==True:
                     if self.mode.BulletTypes[self.mode.BulletTypeIndex]=="Bullet":
-                        self.mode.bullets.append(Bullet(self.mode,self.x,self.y,
-                        self.direction,self.angle))
+                        if self.mode.ammo["Bullet"]>0:
+                            self.mode.ammo["Bullet"]=self.mode.ammo.get("Bullet")-1
+                            self.mode.bullets.append(Bullet(self.mode,self.x,self.y,
+                            self.direction,self.angle))
                     if self.mode.BulletTypes[self.mode.BulletTypeIndex]=="Bomb":
-                        self.mode.bullets.append(Bomb(self.mode,self.x,self.y,
-                        self.direction,self.angle))
+                        if self.mode.ammo["Bomb"]>0:
+                            self.mode.ammo["Bomb"]=self.mode.ammo.get("Bomb")-1
+                            self.mode.bullets.append(Bomb(self.mode,self.x,self.y,
+                            self.direction,self.angle))
                     if self.mode.BulletTypes[self.mode.BulletTypeIndex]=="Missile":
-                        self.mode.bullets.append(Missile(self.mode,self.x,self.y,
-                        self.direction,self.angle))
+                        if self.mode.ammo["Missile"]>0:
+                            self.mode.ammo["Missile"]=self.mode.ammo.get("Missile")-1
+                            self.mode.bullets.append(Missile(self.mode,self.x,self.y,
+                            self.direction,self.angle))
         if(self.x>self.mode.app.width):
             self.x-=self.dx
         if self.x<0:
@@ -93,25 +118,35 @@ class Tank(object):
         #uses the angle given by using up and down arrows
         self.newArmXDistance=self.armLength*math.cos(math.radians(self.angle))
         self.newArmYDistance=self.armLength*math.sin(math.radians(self.angle))
+        self.newAimingArmXDistance=self.aimingArmLength*math.cos(math.radians(self.angle))
+        self.newAImingArmYDistance=self.aimingArmLength*math.sin(math.radians(self.angle))
+        
         bottomAngle=0
         self.armX1=self.x
         self.armY1=self.y-10
         #sets up the barrel(arm) of the tank to move around
         if self.direction=="Right":
             self.armX2=self.armX1+self.newArmXDistance
+            self.armX2Aiming=self.armX1+self.newAimingArmXDistance
             self.armImageX=self.x+self.newArmXDistance/2
             self.tacoImage.transpose(Image.FLIP_LEFT_RIGHT)
         else:
             self.armX2=self.armX1-self.newArmXDistance
+            self.armX2Aiming=self.armX1-self.newAimingArmXDistance
             self.armImageX=self.x-self.newArmXDistance/2
             self.tacoImage.transpose(Image.FLIP_LEFT_RIGHT)
         #sets up the y position of the arm to move around
         self.armY2=self.armY1-self.newArmYDistance
+        self.armY2Aiming=self.armY1-self.newAImingArmYDistance
         self.armX3=self.armX1-6
         self.armY3=self.armY1-12
         self.armX4=self.armX2-6
         self.armY4=self.armY2-12
         self.armImageY=self.y-10-self.newArmYDistance/2
+
+    def drawShootingLine(self,canvas):
+        canvas.create_line(self.armX1,self.armY1,
+        self.armX2Aiming,self.armY2Aiming,fill='red')
         
     #check to see if the bullet collided with the tank
     #if it hasn't then it will add to a new list that will then
@@ -127,6 +162,10 @@ class Tank(object):
                     self.x+=10
                 if direction=="Left":
                     self.x-=10
+                if(self.x>self.mode.app.width):
+                    self.x-=self.dx
+                if self.x<0:
+                    self.x+=self.dx
             elif self.mode.bullets[i].containsPoint(self.x,
             self.y) and isinstance(self.mode.bullets[i],Bullet):
                 self.lives-=1
@@ -151,16 +190,19 @@ class Tank(object):
     def draw(self, canvas):
         if self.alive==True:
             if(self.mode.isGameOver==False):
-                canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
-                fill='green')
-                canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
-                self.armX4,self.armY4,self.armX3,self.armY3,fill='green')
+                if self.mode.aimingOn==True:
+                    self.drawShootingLine(canvas)
+                # canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
+                # fill='green')
+                # canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
+                # self.armX4,self.armY4,self.armX3,self.armY3,fill='green')
+                canvas.create_image(self.x,self.y,image=ImageTk.PhotoImage(self.tankImage))
             #draw lives in the top right
             for i in range(self.lives):
                 canvas.create_image(self.mode.app.width-(1+i)*50, 40,
             image=ImageTk.PhotoImage(self.heart))
-            canvas.create_image(self.armImageX,
-            self.armImageY,image=ImageTk.PhotoImage(self.tacoImage))
+            # canvas.create_image(self.armImageX,
+            # self.armImageY,image=ImageTk.PhotoImage(self.tacoImage))
 
 class Enemy(Tank):
     def __init__(self,mode,x,y,direction):
@@ -174,6 +216,13 @@ class Enemy(Tank):
         self.angle=30
         self.armLength=25
         self.armWidth=10
+        self.aimingArmLength=50
+        self.armX2Aiming=self.x+self.aimingArmLength
+        self.armY2Aiming=self.y-18
+        self.newAimingArmXDistance=0
+        self.newAimingArmYDistance=0
+        self.armY2Aiming=0
+        self.armX2Aiming=0
         tacoURL='https://i.imgur.com/sQSdSo8.png'
         tacoImage=self.mode.loadImage(tacoURL)
         self.tacoImage=self.mode.scaleImage(tacoImage,1/10)
@@ -192,6 +241,16 @@ class Enemy(Tank):
         self.bulletTimer=0
         self.time=0
         self.timeDied=0
+        enemyUrl='https://i.imgur.com/CHxzZj7.png'
+        self.enemyImage=self.mode.loadImage(enemyUrl)
+        self.enemyImage=self.mode.scaleImage(self.enemyImage,1.5)
+        zombieUrl='https://i.imgur.com/WZzxkEo.png'
+        self.zombieImage=self.mode.loadImage(zombieUrl)
+        self.zombieImage=self.mode.scaleImage(self.zombieImage,1.5)
+        if self.direction=="Left":
+            self.enemyImage=self.enemyImage.transpose(Image.FLIP_LEFT_RIGHT)
+            self.zombieImage=self.zombieImage.transpose(Image.FLIP_LEFT_RIGHT)
+
         #for angle in range(0,180)
         #self.tacoDict
         def __eq__(self,other):
@@ -217,18 +276,24 @@ class Enemy(Tank):
             self.mode.tankEnemyKills+=1
             self.lives-=1
             self.alive=False
-            self.mode.points+=15
+            self.mode.points+=25
             self.timeDied=self.mode.totalTime
     
     def draw(self, canvas):
         if self.alive==True:
             if(self.mode.isGameOver==False):
-                canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
-                fill='red')
-                canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
-                self.armX4,self.armY4,self.armX3,self.armY3,fill='red')
+                pass
+                # canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
+                # fill='red')
+                # canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
+                # self.armX4,self.armY4,self.armX3,self.armY3,fill='red')
             if (isinstance(self,ZombieFriend)):
                 canvas.create_text(self.x,self.y-30,text=self.countDownTillDeath//10)
+                canvas.create_image(self.x,self.y,image=ImageTk.PhotoImage(self.zombieImage))
+            else:
+                canvas.create_image(self.x,self.y,image=ImageTk.PhotoImage(self.enemyImage))
+
+
 
 class ZombieEnemy(Enemy):
     def __eq__(self,other):
@@ -236,10 +301,11 @@ class ZombieEnemy(Enemy):
     def draw(self, canvas):
         if self.alive==True:
             if(self.mode.isGameOver==False):
-                canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
-                fill='purple')
-                canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
-                self.armX4,self.armY4,self.armX3,self.armY3,fill='purple')
+                # canvas.create_rectangle(self.x+10,self.y+10,self.x-10,self.y-10,
+                # fill='purple')
+                # canvas.create_polygon(self.armX1,self.armY1,self.armX2,self.armY2,
+                # self.armX4,self.armY4,self.armX3,self.armY3,fill='purple')
+                canvas.create_image(self.x,self.y,image=ImageTk.PhotoImage(self.zombieImage))
 
     def checkIfAlive(self):
         if self.lives==0:
@@ -250,7 +316,7 @@ class ZombieEnemy(Enemy):
             self.timeDied=self.mode.totalTime
             self.mode.tank3Exist=True
             self.mode.tank3=ZombieFriend(self.mode,
-            self.mode.app.width//2-self.mode.app.width//4,self.mode.app.height//2,"Right")
+            self.mode.app.width//2-self.mode.app.width//4,self.mode.app.height//1.3,"Right")
 
 class ZombieFriend(Enemy):
     def __init__(self,mode,x,y,direction):
@@ -264,6 +330,13 @@ class ZombieFriend(Enemy):
         self.angle=30
         self.armLength=25
         self.armWidth=10
+        self.aimingArmLength=50
+        self.armX2Aiming=self.x+self.aimingArmLength
+        self.armY2Aiming=self.y-18
+        self.newAimingArmXDistance=0
+        self.newAimingArmYDistance=0
+        self.armY2Aiming=0
+        self.armX2Aiming=0
         tacoURL='https://i.imgur.com/sQSdSo8.png'
         tacoImage=self.mode.loadImage(tacoURL)
         self.tacoImage=self.mode.scaleImage(tacoImage,1/10)
@@ -285,6 +358,12 @@ class ZombieFriend(Enemy):
         self.mode.tank3Exist=True
         self.color="light purple"
         self.countDownTillDeath=300
+        enemyUrl='https://i.imgur.com/CHxzZj7.png'
+        self.enemyImage=self.mode.loadImage(enemyUrl)
+        self.enemyImage=self.mode.scaleImage(self.enemyImage,1.5)
+        zombieUrl='https://i.imgur.com/WZzxkEo.png'
+        self.zombieImage=self.mode.loadImage(zombieUrl)
+        self.zombieImage=self.mode.scaleImage(self.zombieImage,1.5)
 
     def __eq__(self,other):
         return isinstance(other,ZombieFriend)
@@ -329,20 +408,26 @@ class Player(Tank):
         if len(self.mode.coins)<10 and self.time%100==0:
             for i in range(1):
                 randomX=random.randint(10,self.mode.app.width-10)
-                randomY=random.randint(self.mode.app.height//2-self.mode.app.height//4,self.mode.app.height//2)
+                randomY=random.randint(self.mode.app.height//2,self.mode.app.height//2+self.mode.app.height//4,)
                 self.mode.coins.append(Coin(self.mode,randomX,randomY))
         self.checkIfAlive()
         if self.alive==True:
             self.checkCoinCollisions()
             self.checkBulletCollisions()
             self.moveTankArm()
+    
+    def checkIfAlive(self):
+        if self.lives==0:
+            self.alive=False
+            self.mode.died=True
+            self.mode.endTime=self.mode.totalTime/10
 
     def checkCoinCollisions(self):
         coinsToKeep=[]
         for i in range(len(self.mode.coins)):
             if (self.mode.coins[i].containsPoint(self.x,
             self.y-5) and isinstance(self.mode.coins[i],Coin)):
-                self.mode.points+=1
+                self.mode.points+=50
             else:
                 coinsToKeep+=[self.mode.coins[i]]
         self.mode.coins=coinsToKeep
@@ -383,7 +468,7 @@ class Bullet(object):
         self.mode=mode
         #initial x and y
         self.x=x
-        self.y=y-10
+        self.y=y-20
         self.direction=direction
         self.angle=math.radians(angle)
         self.color='black'
@@ -413,7 +498,7 @@ class Bullet(object):
         return ((x1-x2)**2+(y1-y2)**2)**.5
     #checks if the item contains the point
     def containsPoint(self,x,y):
-        return self.distance(self.dx,self.dy,x,y)<=15
+        return self.distance(self.dx,self.dy,x,y)<=18
     #the physics behind the movement of the bullet
     def fireBullet(self,direction):
         
@@ -434,7 +519,7 @@ class Bullet(object):
     def bulletReachesGround(self):
         bulletsToKeep=[]
         for bullet in self.mode.bullets:
-            if bullet.dy>self.mode.app.height//2+20:
+            if bullet.dy>self.mode.app.height//1.3+15:
                 pass
             else:
                 bulletsToKeep+=[bullet]
@@ -445,7 +530,7 @@ class Bullet(object):
         for i in range(len(self.mode.coins)):
             if (self.mode.coins[i].containsPoint(self.dx,
             self.dy) and isinstance(self.mode.coins[i],Coin)):
-                self.mode.points+=1
+                self.mode.points+=25
             else:
                 coinsToKeep+=[self.mode.coins[i]]
         self.mode.coins=coinsToKeep
@@ -469,17 +554,18 @@ class Bullet(object):
 class EnemyBullet(Bullet):
     def __init__(self,mode,x,y,direction,endX,endY):
         self.mode=mode
-        self.x=x
-        self.y=y-15
         self.direction=direction
+        self.x=x
+        self.velocity=60
+        self.y=y-20
         self.endX=endX
         self.endY=endY
         self.gravity=9.81
-        self.velocity=60
         self.dx=0
         self.dy=0
         self.time=0
         self.color='black'
+        
 
     def __eq__(self,other):
         return isinstance(other,EnemyBullet)
@@ -488,10 +574,20 @@ class EnemyBullet(Bullet):
         return hash(self.x,self.y,self.direction)
 
     def fireBullet(self,direction):
+        print(("distance",self.endX-self.x))
         X=(self.endX-self.x)
-        h=(self.endY-self.y)
-        if X<0:
-            print(X)
+        h=abs(self.endY-self.y)
+        if (self.endX-self.x)>0:
+            # X=(self.x-self.endX)
+            # h=self.y-self.endY
+            X=-X
+            self.velocity=60
+        else:
+            # X=(self.endX-self.x)
+            # h=(self.endY-self.y)
+            self.velocity=60
+        # if X<0:
+        #     print("X",X)
         #print(X,h)
         phi=math.atan(X/h)
         #print(phi)
@@ -500,19 +596,41 @@ class EnemyBullet(Bullet):
         radians=(a+h)/(h**2+X**2)**(1/2)
         #print(radians)
         try:
-            theta=(math.acos(radians)+phi)/2
+            if (self.endX-self.x)>0:
+                theta=-((math.acos(radians)+phi)/2)
+                vx=-self.velocity*math.cos(theta)
+            else:
+                
+                theta=((math.acos(radians)+phi)/2)
+                vx=self.velocity*math.cos(theta)
+            #theta=(math.acos(radians)+phi)/2
             #theta=.5*math.asin(-self.gravity*X/self.velocity**2)
-            vx=self.velocity*math.cos(theta)
+            # if direction=="Right":
+                
+            #     theta=math.degrees((math.acos(radians)+phi)/2)
+            #     vx=self.velocity*math.cos(theta)
+            # else:
+            #     theta=math.degrees((math.acos(radians)+phi)/2)
+            #     vx=self.velocity*math.cos(theta)
+            theta=((math.acos(radians)+phi)/2)
+            #vx=self.velocity*math.cos(theta)
             vy=self.velocity*math.sin(theta)
         except:
-            
-            if direction=="Right":
+            if (self.endX-self.x)>0:
                 theta=math.radians(30)
                 vx=-self.velocity*math.cos(theta)
             else:
                 theta=math.radians(30)
                 vx=self.velocity*math.cos(theta)
             vy=self.velocity*math.sin(theta)
+
+            # if direction=="Right":
+            #     theta=math.radians(30)
+            #     vx=self.velocity*math.cos(theta)
+            # else:
+            #     theta=math.radians(30)
+            #     vx=self.velocity*math.cos(theta)
+            # vy=self.velocity*math.sin(theta)
         
         
         
@@ -579,20 +697,22 @@ class Missile(Bullet):
         #the change in x and y and the position of the bullet
         self.dy=0
         self.dx=0
+        self.missileImage=self.mode.loadImage('https://i.imgur.com/JVON6yE.png')
+        self.missileImage=self.missileImage.rotate(math.degrees(self.angle))
         if self.direction=="Right":
             self.x+=self.initialDistanceXAdded
             self.y-=self.initialDistanceYAdded
         else:
             self.x-=self.initialDistanceXAdded
             self.y-=self.initialDistanceYAdded
+            self.missileImage=self.missileImage.transpose(Image.FLIP_LEFT_RIGHT)
 
     def __eq__(self,other):
         return isinstance(other,Missile)
     
 
     def draw(self,canvas):
-        canvas.create_rectangle(self.dx+10,self.dy+5,self.dx-10,self.dy-5, 
-        fill=self.color)
+        canvas.create_image(self.dx,self.dy,image=ImageTk.PhotoImage(self.missileImage))
 
 
 class GameMode(Mode):
@@ -601,21 +721,29 @@ class GameMode(Mode):
         mode.bullets=[]
         mode.hearts=[]
         mode.tank1=Player(mode,mode.app.width//2-mode.app.width//4,
-        mode.app.height//2,"Right")
+        mode.app.height//1.3,"Right")
         #creates enemy tank
         mode.tank2=Enemy(mode,mode.app.width//2+mode.app.width//4,
-        mode.app.height//2,"Left")
+        mode.app.height//1.3,"Left")
         mode.BulletTypeIndex=0
         mode.BulletTypes=["Bullet","Bomb","Missile"]
         mode.points=0
         mode.coins=[]
         mode.totalTime=0
+        mode.endTime=0
         mode.tankEnemyKills=0
         mode.tank3Exist=False
-        mode.leaderBoard=[]
+        mode.name=""
+        #the amount of ammo to start off with 
+        mode.ammo=dict()
+        mode.ammo["Bullet"]=100
+        mode.ammo["Bomb"]=10
+        mode.ammo["Missile"]=5
+        mode.aimingOn=False
+        
         for i in range(1):
             randomX=random.randint(10,mode.app.width-10)
-            randomY=random.randint(mode.app.height//2-mode.app.height//4,mode.app.height//2)
+            randomY=random.randint(mode.app.height//2+mode.app.height//4,mode.app.height//1.3)
             mode.coins.append(Coin(mode,randomX,randomY))
 
         
@@ -627,6 +755,8 @@ class GameMode(Mode):
         mode.tank1.move(event.key)
         if (event.key=='h'):
             mode.app.setActiveMode(mode.app.helpMode)
+        if event.key=='s':
+            mode.app.setActiveMode(mode.app.shopMode)
         
         #checks to see if game is over and sets up for end game screen
         if(mode.isGameOver==True):
@@ -642,6 +772,8 @@ class GameMode(Mode):
             if heart.containsPoint(event.x+mode.scrollX,event.y):
                 mode.draggingHeart=heart
         mode.changeBulletType(event)
+        mode.changeAimingOn(event)
+        mode.goToShop(event)
     def mouseReleased(mode,event):
         pass
     def mouseDragged(mode,event):
@@ -651,6 +783,27 @@ class GameMode(Mode):
         # if not mode.draggingHeart is None:
         #     mode.draggingHeart.x=event.x+mode.scrollX
         #     mode.draggingHeart.y=event.y
+
+    def goToShop(mode,event):
+        leftX=mode.app.width//100+35
+        rightX=mode.app.width//100+35+70
+        bottomY=mode.app.height-mode.app.height//100
+        topY=mode.app.height-mode.app.height//100-30
+        if event.x>leftX and event.x<rightX:
+            if event.y<bottomY and event.y>topY:
+                mode.app.setActiveMode(mode.app.shopMode)
+                
+    def changeAimingOn(mode,event):
+        leftX=mode.app.width//100
+        rightX=mode.app.width//100+30
+        bottomY=mode.app.height-mode.app.height//100
+        topY=mode.app.height-mode.app.height//100-30
+        if event.x>leftX and event.x<rightX:
+            if event.y<bottomY and event.y>topY:
+                if mode.aimingOn==False:
+                    mode.aimingOn=True
+                else:
+                    mode.aimingOn=False
 
     def changeBulletType(mode,event):
     
@@ -666,29 +819,45 @@ class GameMode(Mode):
 
     def timerFired(mode):
         mode.totalTime+=1
-        mode.tank1.timerFired()
-        mode.tank2.timerFired()
-        if mode.tank3Exist:
-            mode.tank3.timerFired()
-        if mode.tank2.alive==False and (mode.totalTime-mode.tank2.timeDied)==20:
-            if mode.tankEnemyKills%3==0:
-                mode.tank2=ZombieEnemy(mode,mode.app.width//2+mode.app.width//3,
-        mode.app.height//2,"Left")
-            else:
-                mode.tank2=Enemy(mode,mode.app.width//2+mode.app.width//4,
-            mode.app.height//2,"Left")
+        mode.totalTime
+        if mode.totalTime==1800:
+            mode.isGameOver=True
+        if(mode.isGameOver==False):
+            mode.tank1.timerFired()
+            mode.tank2.timerFired()
+            if mode.tank3Exist:
+                mode.tank3.timerFired()
+            if mode.tank2.alive==False and (mode.totalTime-mode.tank2.timeDied)==20:
+                randomX=random.randint(10,mode.app.width-10)
+                #randomY=random.randint(mode.app.height//2-mode.app.height//4,mode.app.height//2)
+                if mode.tankEnemyKills%3==0:
+                    mode.tank2=ZombieEnemy(mode,mode.app.width//2+mode.app.width//3,
+            mode.app.height//1.3,"Left")
+                else:
+                    if mode.tank1.x-randomX<0:
+                        mode.tank2=Enemy(mode,randomX,
+                    mode.app.height//1.3,"Left")
+                    else:
+                        mode.tank2=Enemy(mode,randomX,
+                    mode.app.height//1.3,"Right")
 
-        for bullet in mode.bullets:
-            bullet.timerFired()
-        if(mode.isGameOver==True):
-            pass
+            for bullet in mode.bullets:
+                bullet.timerFired()
+        
         #changes isGameOver if player died
         if(mode.died==True):
             mode.isGameOver=True
+            mode.endTime=mode.totalTime
+        elif mode.isGameOver==True and mode.tank1.alive==True:
+            mode.endTime=mode.totalTime
+            mode.tank1.alive=False
+            mode.app.setActiveMode(mode.app.endScreenMode)
+        if mode.isGameOver==True:
+            mode.points+=mode.endTime//10
+            mode.app.setActiveMode(mode.app.endScreenMode)
 
-    def setLeaderBoard(mode,points,name):
-        if len(mode.leaderBoard)<10:
-            pass
+
+
 
 
     def getSelectionTrianglePoints(mode):
@@ -716,64 +885,282 @@ class GameMode(Mode):
         fill='yellow',)
         
         canvas.create_polygon(leftX1,endPointY,leftX2,y2,leftX2,y3,fill='yellow')
-        canvas.create_text(rightX2//2,endPointY,text=mode.BulletTypes[mode.BulletTypeIndex])
+        canvas.create_text(rightX2//2,endPointY,
+        text=f'{mode.BulletTypes[mode.BulletTypeIndex]}x{mode.ammo[mode.BulletTypes[mode.BulletTypeIndex]]}')
     
     def drawPointsAndTime(mode,canvas):
         canvas.create_text(mode.app.width//2-mode.app.width//10,20,text=mode.points)
         canvas.create_text(mode.app.width//2+mode.app.width//10,20,text=f'time:{mode.totalTime/10}')
+    
+    def drawAimingBox(mode,canvas):
+        if mode.aimingOn==False:
+            canvas.create_rectangle(mode.app.width//100,mode.app.height-mode.app.height//100,
+            mode.app.width//100+30,mode.app.height-mode.app.height//100-30,)
+        else:
+            canvas.create_rectangle(mode.app.width//100,mode.app.height-mode.app.height//100,
+            mode.app.width//100+30,mode.app.height-mode.app.height//100-30,
+            fill='red')
+        middlex=(mode.app.width//100+mode.app.width//100+30)//2
+        middley=(mode.app.height-mode.app.height//100+
+        mode.app.height-mode.app.height//100-30)//2
+        canvas.create_text(middlex,middley,text="A",font="Arial 20")
+
+    def drawShopingBox(mode,canvas):
+        canvas.create_rectangle(mode.app.width//100+35,mode.app.height-mode.app.height//100,
+            mode.app.width//100+35+70,mode.app.height-mode.app.height//100-30,
+            fill='purple')
+        middlex=(mode.app.width//100+35+mode.app.width//100+35+70)//2
+        middley=(mode.app.height-mode.app.height//100+
+        mode.app.height-mode.app.height//100-30)//2
+        canvas.create_text(middlex,middley,text="Arsenal",font="Arial 15")
+
+
+    def redrawAll(mode,canvas):
+        if mode.isGameOver==False:
+            canvas.create_rectangle(0,0,mode.app.width,mode.app.width,fill='light blue')
+            canvas.create_rectangle(0,mode.app.height//1.3+10,mode.app.width,mode.app.height,fill='dark green')
+            mode.drawPointsAndTime(canvas)
+            mode.tank1.draw(canvas)
+            mode.tank2.draw(canvas)
+            if mode.tank3Exist:
+                mode.tank3.draw(canvas)
+            for bullet in mode.bullets:
+                bullet.draw(canvas)
+            for coin in mode.coins:
+                coin.draw(canvas)
+            mode.drawBulletSelection(canvas)
+            mode.drawAimingBox(canvas)
+            mode.drawShopingBox(canvas)
+
+
+            
+class EndScreenMode(Mode):
+    def appStarted(mode):
+        mode.died=mode.app.gameMode.died
+        mode.endTime=mode.app.gameMode.endTime
+        mode.points=mode.app.gameMode.points
+        ES1Url='https://i.imgur.com/xmirSO4.png'
+        mode.EndScreen=mode.loadImage(ES1Url)
+        mode.EndScreen=mode.scaleImage(mode.EndScreen,1/2.5)
+
+    def keyPressed(mode, event):
+        if event.key=='r':
+            MyModalApp(width=800,height=500)
 
     def redrawAll(mode,canvas):
         canvas.create_rectangle(0,0,mode.app.width,mode.app.width,fill='light blue')
-        canvas.create_rectangle(0,mode.app.height//2+10,mode.app.width,mode.app.height,fill='dark green')
-        mode.drawPointsAndTime(canvas)
-        mode.tank1.draw(canvas)
-        mode.tank2.draw(canvas)
-        if mode.tank3Exist:
-            mode.tank3.draw(canvas)
-        for bullet in mode.bullets:
-            bullet.draw(canvas)
-        for coin in mode.coins:
-            coin.draw(canvas)
-        mode.drawBulletSelection(canvas)
-        if(mode.isGameOver==True):
-            if(mode.died==True):
-                font = 'Arial 26 bold'
-                canvas.create_text(mode.width/2, 150, 
-                text="You did not make it :(\n press r to restart", font=font)   
-            else:
-                font = 'Arial 26 bold'
-                text=('WINNER!\n'+
-                'press r to restart')
-                canvas.create_text(mode.width/2, 150,text=text, font=font)
-class EndScreenMode(Mode):
+        canvas.create_rectangle(0,mode.app.height//1.3+10,mode.app.width,mode.app.height,fill='dark green')
+        if(mode.died==True):
+            font = 'Arial 26 bold'
+            canvas.create_text(mode.width/1.3, 150, 
+            text="You did not make it :(\n press r to restart", font=font)
+            canvas.create_text(mode.app.width//2,mode.app.height//2,
+            text=f'{mode.points} points in \n {mode.endTime/10} seconds',font=font)
+            #self.name=input("Enter your name: ")
+                
+        else:
+            font = 'Arial 26 bold'
+            text=('WINNER!\n'+
+            'press r to restart')
+            canvas.create_text(mode.width/2, 150,text=text, font=font)
+            canvas.create_text(mode.app.width//2,mode.app.height//2,
+            text=f'{mode.points} points in \n {mode.endTime} time',font=font)
+
+class ShopMode(Mode):
     def appStarted(mode):
-        pass
+        mode.cursor=[-1,-1]
+        heartURL=('https://cdn.pixabay.com/photo/2017/09/23/16/33/'+
+        'pixel-heart-2779422_1280.png')
+        heart=mode.loadImage(heartURL)
+        mode.heart=mode.scaleImage(heart,1/20)
+        missile=mode.loadImage('https://i.imgur.com/JVON6yE.png')
+        mode.missileImage=mode.scaleImage(missile,4)
+
+    def mouseMoved(mode,event):
+        # mode.app._root.configure(cursor='none')
+        mode.cursor=[event.x,event.y]
+
+    def goBackToGame(mode,event):
+        middlex=(mode.app.width//10//2+(mode.app.width//10//2)*5)//2
+        middley=(mode.app.height//10//2+(mode.app.height//10//2)*3)//2
+        leftX=mode.app.width//10//2
+        rightX=(mode.app.width//10//2)*5
+        bottomY=(mode.app.height//10//2)*3
+        topY=mode.app.height//10//2
+        if event.x>leftX and event.x<rightX:
+            if event.y<bottomY and event.y>topY:
+                mode.app.setActiveMode(mode.app.gameMode)
+    def mousePressed(mode,event):
+        oneHundredHeight=mode.app.height//(mode.app.height//100)
+        thirtyX=mode.app.width//(mode.app.width//10*(1/3))
+        mode.goBackToGame(event)
+        #buying on the left side
+        if event.x>thirtyX and event.x<mode.app.width//2-thirtyX//2:
+            #to buy for bomb
+            if event.y>oneHundredHeight and event.y<mode.app.height//2+25:
+                if mode.app.gameMode.points-5>0:
+                    mode.app.gameMode.ammo["Bomb"]=mode.app.gameMode.ammo.get("Bomb")+10
+                    mode.app.gameMode.points-=5
+            #to buy a life
+            if event.y>mode.app.height//2+50 and event.y<mode.app.height-20:
+                if mode.app.gameMode.points-25>0:
+                    mode.app.gameMode.tank1.lives+=1
+                    mode.app.gameMode.points-=25
+        #buying on the right side
+        if event.x>mode.app.width//2+thirtyX//2 and event.x<mode.app.width-thirtyX:
+            #to buy for missile
+            if event.y>oneHundredHeight and event.y<mode.app.height-20:
+                #if you have the points you can buy a missile
+                if mode.app.gameMode.points-50>0:
+                    mode.app.gameMode.ammo["Missile"]=mode.app.gameMode.ammo.get("Missile")+10
+                    mode.app.gameMode.points-=50
+                #mode.app.gameMode.ammo["Missile"]=mode.app.gameMode.ammo.get("Missile")+10
+    
+
+
+    def redrawAll(mode, canvas):
+        #gets cursor values
+        cursorX,cursorY=mode.cursor
+        #overall background
+        canvas.create_rectangle(0,0,mode.app.width,mode.app.width,fill='light blue')
+        canvas.create_text(mode.app.width//2,mode.app.height//10,text="Arsenal",font="Arial 26")
+        #dimensions of the the arsenal based on size of canvas
+        oneHundredHeight=mode.app.height//(mode.app.height//100)
+        thirtyX=mode.app.width//(mode.app.width//10*(1/3))
+        #text for arsenal
+        #bomb box
+        canvas.create_rectangle(thirtyX,oneHundredHeight,mode.app.width//2-thirtyX//2,mode.app.height//2+25,fill="white")
+        canvas.create_text((thirtyX+mode.app.width//2-thirtyX//2)//2,
+        oneHundredHeight+oneHundredHeight//10,text="Bomb x10", font="Arial 15")
+        canvas.create_text((thirtyX+mode.app.width//2-thirtyX//2)//2,
+        mode.app.height//2+25-oneHundredHeight//10,text="5 points", font="Arial 15")
+        bombBoxCenterX=(thirtyX+mode.app.width//2-thirtyX//2)//2
+        bombBoxCenterY=(oneHundredHeight-thirtyX//2+mode.app.height//2+25)//2
+        canvas.create_oval(bombBoxCenterX-20,bombBoxCenterY-20,
+        bombBoxCenterX+20,bombBoxCenterY+20,fill='red')
+        #extra life box
+        canvas.create_rectangle(thirtyX,mode.app.height//2+50,
+        mode.app.width//2-thirtyX//2,mode.app.height-20,fill="white")
+        canvas.create_text((thirtyX+mode.app.width//2-thirtyX//2)//2,
+        mode.app.height//2+50+oneHundredHeight//10,text="Life",font="Arial 15")
+        canvas.create_text((thirtyX+mode.app.width//2-thirtyX//2)//2,
+        mode.app.height-20-oneHundredHeight//10,text="25 points",font="Arial 15")
+        canvas.create_image((thirtyX+mode.app.width//2-thirtyX//2)//2,
+        (mode.app.height//2+50+mode.app.height-20)//2,image=ImageTk.PhotoImage(mode.heart))
+        #missle box
+        canvas.create_rectangle(mode.app.width//2+thirtyX//2,
+        oneHundredHeight,mode.app.width-thirtyX,mode.app.height-20,fill="white")
+        canvas.create_text((mode.app.width//2+thirtyX//2+mode.app.width-thirtyX)//2,
+        oneHundredHeight+oneHundredHeight//10,text="Missile x10",font="Arial 15")
+        canvas.create_text((mode.app.width//2+thirtyX//2+mode.app.width-thirtyX)//2,
+        mode.app.height-20-oneHundredHeight//10,text="50 points",font="Arial 15")
+        canvas.create_image((mode.app.width//2+thirtyX//2+mode.app.width-thirtyX)//2,
+        (oneHundredHeight+mode.app.height-20)//2,
+        image=ImageTk.PhotoImage(mode.missileImage))
+        #draw goback box
+        canvas.create_rectangle(mode.app.width//10//2,mode.app.height//10//2,
+        (mode.app.width//10//2)*5,(mode.app.height//10//2)*3,fill="navy")
+        middlex=(mode.app.width//10//2+(mode.app.width//10//2)*5)//2
+        middley=(mode.app.height//10//2+(mode.app.height//10//2)*3)//2
+        canvas.create_text(middlex,middley,text="Back",font="Arial 20",fill='white')
+    def keyPressed(mode, event):
+        if event.key=='s':
+            mode.app.setActiveMode(mode.app.gameMode)
+
+
 class SplashScreenMode(Mode):
     def appStarted(mode):
-        pass
+        SS1Url='https://i.imgur.com/yLLO8FF.png'
+        mode.splashScreen=mode.loadImage(SS1Url)
+        mode.splashScreen=mode.scaleImage(mode.splashScreen,1/2.5)
     def redrawAll(mode, canvas):
-        pass
+        canvas.create_image(mode.app.width//2,mode.app.height//2,image=ImageTk.PhotoImage(mode.splashScreen))
+        canvas.create_text(mode.app.width//2,mode.app.height//1.1,
+        text="Press h to go to the help screen and space to begin",
+        font="Arial 15")
+        x1=mode.app.width//2-40
+        x2=mode.app.width//2+40
+        y1=mode.app.height//2-20
     def keyPressed(mode, event):
-        pass
+        if event.key=="h":
+            mode.app.setActiveMode(mode.app.helpMode)
+        if event.key=="Space":
+            mode.app.setActiveMode(mode.app.gameMode)
 class HelpMode(Mode):
     def appStarted(mode):
-        pass
+        mode.points=0
+        mode.totalTime=0
+        mode.slides=0
+        
+        slide1Url='https://i.imgur.com/8KtW4Cg.png'
+        mode.slide1=mode.loadImage(slide1Url)
+        mode.slide1=mode.scaleImage(mode.slide1,1/2.5)
+        slide2Url='https://i.imgur.com/jLrW3ju.png'
+        mode.slide2=mode.loadImage(slide2Url)
+        mode.slide2=mode.scaleImage(mode.slide2,1/2.5)
+        slide3Url='https://i.imgur.com/qqr9W3w.png'
+        mode.slide3=mode.loadImage(slide3Url)
+        mode.slide3=mode.scaleImage(mode.slide3,1/2.5)
+        slide4Url='https://i.imgur.com/obFJLXk.png'
+        mode.slide4=mode.loadImage(slide4Url)
+        mode.slide4=mode.scaleImage(mode.slide4,1/2.5)
+        slide5Url='https://i.imgur.com/r8923eh.png'
+        mode.slide5=mode.loadImage(slide5Url)
+        mode.slide5=mode.scaleImage(mode.slide5,1/2.5)
+        slide6Url='https://i.imgur.com/ALMzI1P.png'
+        mode.slide6=mode.loadImage(slide6Url)
+        mode.slide6=mode.scaleImage(mode.slide6,1/2.5)
+    
+
+    def drawPointsAndTime(mode,canvas):
+        canvas.create_text(mode.app.width//2-mode.app.width//10,20,text=mode.points)
+        canvas.create_text(mode.app.width//2+mode.app.width//10,20,text=f'time:{mode.totalTime/10}')
     #draws background
     def redrawAll(mode, canvas):
-        pass
+        if mode.slides%7==0:
+            canvas.create_rectangle(0,0,mode.app.width,mode.app.width,fill='light blue')
+            canvas.create_rectangle(0,mode.app.height//1.3+10,mode.app.width,mode.app.height,fill='dark green')
+            mode.drawPointsAndTime(canvas)
+            canvas.create_text(mode.app.width//2,mode.app.height//2,
+            text="Press the right and left arrow keys to \n switch the tutorial slides\n press h to start",
+            font="Arial 26")
+        if mode.slides%7==1:
+            canvas.create_image(mode.app.width//2,mode.app.height//2,image=ImageTk.PhotoImage(mode.slide1))
+        if mode.slides%7==2:
+            canvas.create_image(mode.app.width//2,mode.app.height//2,image=ImageTk.PhotoImage(mode.slide2))
+        if mode.slides%7==3:
+            canvas.create_image(mode.app.width//2,mode.app.height//2,image=ImageTk.PhotoImage(mode.slide3))
+        if mode.slides%7==4:
+            canvas.create_image(mode.app.width//2,mode.app.height//2,image=ImageTk.PhotoImage(mode.slide4))
+        if mode.slides%7==5:
+            canvas.create_image(mode.app.width//2,mode.app.height//2,image=ImageTk.PhotoImage(mode.slide5))
+        if mode.slides%7==6:
+            canvas.create_image(mode.app.width//2,mode.app.height//2,image=ImageTk.PhotoImage(mode.slide6))
+            
+
+
     #if any key is pressed the game starts
     def keyPressed(mode, event):
-        mode.app.setActiveMode(mode.app.gameMode)
+        if event.key=="Right":
+            mode.slides+=1
+        elif event.key=="Left":
+            mode.slides-=1
+        elif event.key=="h":
+            mode.app.setActiveMode(mode.app.gameMode)
+        else:
+            mode.app.setActiveMode(mode.app.splashScreenMode)
 #holds all the game functions
 class MyModalApp(ModalApp):
     def appStarted(app):
-        #app.splashScreenMode = SplashScreenMode()
+        app.splashScreenMode = SplashScreenMode()
         app.gameMode = GameMode()
-        #app.helpMode = HelpMode()
-        app.setActiveMode(app.gameMode)
-        #app.setActiveMode(app.splashScreenMode)
+        app.helpMode = HelpMode()
+        app.endScreenMode=EndScreenMode()
+        app.shopMode=ShopMode()
+        #app.setActiveMode(app.gameMode)
+        app.setActiveMode(app.splashScreenMode)
         app.timerDelay = 50
  
 def runTanks():
-    MyModalApp(width=700,height=700)
+    MyModalApp(width=800,height=500)
 runTanks()
