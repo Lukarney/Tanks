@@ -964,7 +964,7 @@ class EndScreenMode(Mode):
             'press r to restart')
             canvas.create_text(mode.width/2, 150,text=text, font=font)
             canvas.create_text(mode.app.width//2,mode.app.height//2,
-            text=f'{mode.points} points in \n {mode.endTime} time',font=font)
+            text=f'{mode.points} points in \n {mode.endTime/10} time',font=font)
 
 class ShopMode(Mode):
     def appStarted(mode):
